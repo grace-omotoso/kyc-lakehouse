@@ -1,4 +1,4 @@
-# KYC/AML Lakehouse on Databricks
+# AML/KYC Lakehouse on Databricks
 
 An end-to-end data pipeline that ingests synthetic KYC/AML data from Amazon S3 into a Databricks lakehouse (medallion architecture), governed by Unity Catalog.
 
@@ -17,19 +17,10 @@ A bank needs to monitor customer transactions for money-laundering risk. Three f
 
 ![Architecture diagram](docs/architecture.png)
 
-This project is divided into 3 phases;
-
-- **Initial Setup**: Covers everything from synthetic data generation, AWS, databricks connection to AWS, and catalog/schema connection
-- **Medallion Lakehouse**: This covers the bronze, silver and gold layers of the medallion architecture
-- **Governance, monitoring and deployment**
-
-
-## INITIAL SET UP
-
-### Step 1: Synthetic Data Generation
+## Step 1: Synthetic Data Generation
 The data used in this project is fully synthetic. Names, SSNs (9xx range, never issued) and accounts are fake. This is the ![python code](src/generator/generate_kyc_data.py ) used to generate the synthetic data.
  
-#### Data model
+### Data model
 
 ```mermaid
 erDiagram
@@ -73,7 +64,7 @@ erDiagram
   }
 ```
 
-#### Planted data issues (what each one tests)
+### Planted data issues (what each one tests)
 
 | Issue | Purpose |
 |---|---|
@@ -86,10 +77,10 @@ erDiagram
 | Structuring (4-6 deposits of 9,000-9,900) and high-risk-country transfers | AML detection scenarios in Gold |
 | Customer names matching the watchlist | Screening and false-positive handling |
 
-### Step 2: AWS Setup
+## Step 2: AWS Setup
 In this project we moved the generated data to S3 to mimic real life situation. We can have data coming from various sources but most times, they make their way to S3 raw and unfiltered. Using S3 provides the opportunity to learn all the necessary steps needed to connect S3 to Databricks. The S3 setup step can be skipped if AWS cost will be an issue.
 
-#### 1. S3 bucket
+### 1. S3 bucket
 Create a bucket (this project uses `kyc-lakehouse-gracomot`) with default SSE-S3 encryption. Create a unique name for your S3 bucket. Upload the landing folders with the specifications (files) below;
 Create a managed folder and checkpoint folders inside the bucket. `managed/` is used by Unity Catalog and stays empty of hand-written files.
 
@@ -109,7 +100,7 @@ kyc-lakehouse-<id>/
 ```
 As suggested above, we are loading day1 and day2 data for customers and transactions. We are leaveing out the late file in the transaction day2 folder as this will be used to explain how autoloader handles late arriving data. Watchlist is a single small file so it should be loaded.
 
-#### 2. IAM role for Unity Catalog
+### 2. IAM role for Unity Catalog
 
 Role name: `kyc-lakehouse-uc-s3-access`. Setup is two passes, because the role must exist before it can trust itself and the external ID only exists after the storage credential is created.
 
@@ -168,7 +159,7 @@ Attach the S3 policY to the role. Open your role, then Permissions, then Add per
 **Step 4: Copy the Role ARN **
 Copy the role ARN. It’s at the top of the role page and looks like arn:aws:iam::<AWS-ACCOUNT-ID>:role/kyc-lakehouse-uc-role.
 
-### Step 3: Hand off to Databricks
+## Step 3: Hand off to Databricks
 In this step, we connnect AWS S3 to databricks so we can access the data in our S3 bucket from databricks. 
 Navigate to your databricks account;
 1. **Catalog > External data > Credentials > Create credential**, select *Storage credential*, type AWS IAM Role. Enter a name and the role ARN. Databricks then shows the external ID. Copy the external ID.
@@ -180,7 +171,7 @@ Back in AWS, open the role, go to the Trust relationships tab, and replace the <
 
 4. Click **Test connection**. A pass confirms the role, trust policy and permissions are aligned.
 
-### Step 4: Create Catalog and schemas
+## Step 4: Create Catalog and schemas
 
 ```sql
 CREATE CATALOG IF NOT EXISTS dev_kyc
@@ -193,19 +184,13 @@ CREATE SCHEMA IF NOT EXISTS dev_kyc.ops;
 ```
 
 Unity Catalog also creates `default` and `information_schema` automatically. Confirm schemas have been created by running the
-statement. You should see 6 schemas below (2 default and the 4 schemas in the statement above)
+statement.
  `SHOW SCHEMAS IN dev_kyc;`
 
-##  MEDALLION ARCHITECTURE
 
-### Bronze layer
+## Bronze layer
 
-In the bronze layer, we will bring in data from S3 as it is. 
-In databricks, click on Jobs and Pipelines and select an ingestion pipeline.
-
-**Pipeline settings**: root folder `src/pipelines`, source path `src/pipelines/transformations`, default catalog `dev_kyc`, default schema `bronze`.
-
-Replace the transformation.py file with bronze.sql and run the use the statement below. Replace the S3 path with your path.
+Pipeline settings: root folder `src/pipelines`, source path `src/pipelines/transformations`, default catalog `dev_kyc`, default schema `bronze`.
 
 ```sql
 CREATE OR REFRESH STREAMING TABLE transactions AS
@@ -221,8 +206,9 @@ SELECT *, _metadata.file_path AS source_file, current_timestamp() AS ingest_ts
 FROM read_files('s3://kyc-lakehouse-gracomot/landing/watchlist/', format => 'csv', header => true);
 ```
 
+**Note**: Two metadata columns (source_file and ingest_ts)have been appended to the tables for auditability. They record where each row came from and when it was loaded, which are two things the raw data can’t tell you itself. Bronze is the system of record for what arrived, so it needs that provenance.
 
-Bronze rules: no cleaning, append-only, audit columns only (`source_file`, `ingest_ts`). Dirty data stays so the layer is auditable and replayable.
+**Bronze rules**: no cleaning, append-only, audit columns only (`source_file`, `ingest_ts`). Dirty data stays so the layer is auditable and replayable.
 
 ### Verified results (days 1-2 loaded)
 
@@ -232,7 +218,7 @@ Bronze rules: no cleaning, append-only, audit columns only (`source_file`, `inge
 | `dev_kyc.bronze.transactions` | 4,076 |
 | `dev_kyc.bronze.watchlist` | 6 |
 
-## Design decisions
+## Design Decisions
 
 | Decision | Why |
 |---|---|
@@ -262,8 +248,9 @@ Bronze rules: no cleaning, append-only, audit columns only (`source_file`, `inge
 kyc-lakehouse/
   src/
     pipelines/
-      transformations/
-        bronze.sql              # Lakeflow Declarative Pipeline source
+      ingestion
+        transformations/
+          bronze.sql              # Lakeflow Declarative Pipeline source
     generator/
       generate_kyc_data.py      # synthetic data generator
   docs/                         # diagrams and notes
