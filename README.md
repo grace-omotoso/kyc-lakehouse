@@ -258,7 +258,7 @@ kyc-lakehouse/
 ```
 
 ### Late Arriving Data
-In this session, we will explain how autoloader handles late arriving data. The ![notebook](docs/utilities/late_arrival) has some handy code you can run to demonstrate how autoloader handles late arriving files. We will go through the following steps
+In this session, we will explain how autoloader handles late arriving data. This ![notebook](src/utilities/late_arrival) has some handy code you can run to demonstrate how autoloader handles late arriving files. We will go through the following steps
 
 1. **Record a baseline**
 ```
@@ -280,6 +280,41 @@ The transaction node writes about 150 rows. This shows that only new file was pr
 
 ![Rerun of Data Ingestion Pipeline after later arrival file](docs/graph_after_late_arrival.png)
 
+### Schema Evolution
+In this session, we will explain how autoloader handles schema evolution. This ![notebook](src/utilities/schema_evolution) has some handy code you can run to demonstrate how autoloader handles schema evolution. We will go through the following steps
+
+1. **Record a baseline**
+```
+SELECT COUNT(*) FROM dev_kyc.bronze.transactions;   -- 4,226 if the late file is loaded (4,076 + 150)
+SELECT COUNT(*) FROM dev_kyc.bronze.customers;      -- 215
+DESCRIBE TABLE dev_kyc.bronze.transactions;          -- note: no channel column yet
+```
+Notice how channel column is missing in the transactions table
+
+![](docs/before_evolution)
+
+The column `channel` is missing here
+
+2. **Upload day 3 files**
+
+- Upload day 3 transaction into s3 transaction folder. This file has a new column called channel
+- Upload day 3 customer into s3 customer folder. This file has some update to previous customer records and new customer records
+
+
+3. **Rerun the Ingestion Pipeline**
+
+- Use the normal Run pipeline button, not Full refresh. A full refresh reloads everything and would hide the incremental behavior you’re trying to show.
+- The first run may fail or stop on the trasaction node. By default, when Auto Loader sees a field it hasn’t seen before, it stops the stream, records the new column in its stored schema, and expects a retry. The error will look like an unknown-field exception naming channel. Pipelines often retry automatically, in which case you’ll see a failed attempt followed by a successful one. If it doesn’t, run the pipeline again. This stop-and-retry behavior is the schema evolution mechanism, not a bug.
+
+![](docs/first_run_after_evolution.png)
+
+- On the successful run, transactions writes about 2,040 new rows and customers about 15. Earlier days aren’t reprocessed.
+
+![](docs/rerunning_after_txn_stopped.png)
+
+
+
+
 
 ## Roadmap
 
@@ -287,7 +322,7 @@ The transaction node writes about 150 rows. This shows that only new file was pr
 - [x] Catalog and schemas
 - [x] Synthetic data generator
 - [x] Bronze layer (days 1-2)
-- [ ] Bronze incremental test (day 3 schema change, late file)
+- [x] Bronze incremental test (day 3 schema change, late file)
 - [ ] Silver: type casting, dedup, expectations, quarantine, SCD2 customers
 - [ ] Gold: star schema, risk aggregates, watchlist screening flags
 - [ ] Governance: groups, column masks, row filters, lineage
