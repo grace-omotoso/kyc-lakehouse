@@ -257,6 +257,30 @@ kyc-lakehouse/
   README.md
 ```
 
+### Late Arriving Data
+In this session, we will explain how autoloader handles late arriving data. The ![notebook](docs/utilities/late_arrival) has some handy code you can run to demonstrate how autoloader handles late arriving files. We will go through the following steps
+
+1. **Record a baseline**
+```
+SELECT COUNT(*) FROM dev_kyc.bronze.transactions;   -- 4,076
+SELECT source_file, COUNT(*) FROM dev_kyc.bronze.transactions GROUP BY 1;
+```
+In the jobs and Pipelines section, the graph for the last pipeline will look like the one below, notice the count;
+
+![Initial Run of Data Ingestion Pipeline](docs/graph_before_arrival.png)
+
+2. **Upload the late file**
+Upload the late file transactions_late_002 in day 2 of S3 transaction folder and rerun the pipeline.
+
+
+3. Rerun the Ingestion Pipeline
+Use the normal Run pipeline button, not Full refresh. A full refresh reloads everything and would hide the incremental behavior you’re trying to show.
+
+The transaction node writes about 150 rows. This shows that only new file was processed. Watchlist was processed again since it is a materialized table.
+
+![Rerun of Data Ingestion Pipeline after later arrival file](docs/graph_after_late_arrival.png)
+
+
 ## Roadmap
 
 - [x] S3 bucket, IAM role, storage credential, external location
