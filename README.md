@@ -342,7 +342,7 @@ kyc-lakehouse/
 - [x] Synthetic data generator
 - [x] Bronze layer (days 1-2)
 - [x] Bronze incremental test (day 3 schema change, late file)
-- [x ] Silver: type casting, dedup, expectations, quarantine, SCD2 customers
+- [x] Silver: type casting, dedup, expectations, quarantine, SCD2 customers
 - [ ] Gold: star schema, risk aggregates, watchlist screening flags
 - [ ] Governance: groups, column masks, row filters, lineage
 - [ ] SQL warehouse and dashboard
