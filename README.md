@@ -233,7 +233,7 @@ FROM read_files('s3://kyc-lakehouse-gracomot/landing/watchlist/', format => 'csv
 
 
 ### Late Arriving Data
-In this session, we will explain how autoloader handles late arriving data. This ![notebook](src/utilities/late_arrival) has some handy code you can run to demonstrate how autoloader handles late arriving files. We will go through the following steps
+In this session, we will explain how autoloader handles late arriving data. This ![notebook](src/utilities/late_arrival.ipynb) has some handy code you can run to demonstrate how autoloader handles late arriving files. We will go through the following steps
 
 1. **Record a baseline**
 ```
@@ -256,7 +256,7 @@ The transaction node writes about 150 rows. This shows that only new file was pr
 ![Rerun of Data Ingestion Pipeline after later arrival file](docs/graph_after_late_arrival.png)
 
 ### Schema Evolution
-In this session, we will explain how autoloader handles schema evolution. This ![notebook](src/utilities/schema_evolution) has some handy code you can run to demonstrate how autoloader handles schema evolution. We will go through the following steps
+In this session, we will explain how autoloader handles schema evolution. This ![notebook](src/utilities/schema_evolution.ipynb) has some handy code you can run to demonstrate how autoloader handles schema evolution. We will go through the following steps
 
 1. **Record a baseline**
 ```
@@ -309,7 +309,13 @@ The silver layer of the transformation pipeline involves the following processin
 
   6. **Customers SCD2**: In a bid to keep history on Customers, it is brought in as an SCD2 stream on a separate filed. History is only preserved when there is a change on address, city, state, risk_rating. This is done in order to demonstrate the difference between SCD1 and SCD2. In real life, it can be brought as an SCD2 stream only
 
-  This ![notebook](docs/utilities/silver_check.ipynb) has some code that can be used to validate the processing steps listed above. 
+  Run the transformation_pipeline pipeline (ensure there is a transformation folder with silver.sql file). The graph from the run should look similar to the one below;
+
+  ![](docs/transformation_pipeline.png)
+
+
+  This ![notebook](src/utilities/silver_check.ipynb) has some code that can be used to validate the processing steps listed above. 
+
 
 ## Repository layout
 
