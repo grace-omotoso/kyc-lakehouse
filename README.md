@@ -231,31 +231,6 @@ FROM read_files('s3://kyc-lakehouse-gracomot/landing/watchlist/', format => 'csv
 | Default SSE-S3 encryption for now | Avoids a second permission layer (KMS) while building. Moving to SSE-KMS with a customer-managed key is a planned hardening step |
 | Name-only watchlist matching | The watchlist has no reliable shared identifier (SSNs are US-only and rare on real lists). Treat matches as potential, score with secondary attributes, and route to review |
 
-## Issues hit and fixes
-
-| Issue | Cause and fix |
-|---|---|
-| Role setup seemed circular | The role must exist before it can trust itself, and the external ID only exists after the credential is created. Create with a placeholder, then update the trust policy |
-| Test connection fails | Usually the external ID in the trust policy doesn't match exactly, or the role's own ARN is missing from the trust policy (self-assume) |
-| SQL pasted into `my_transformation.py` | The file extension sets the language. Create a `.sql` file and delete the template |
-| `_metadata.file_path` missing from a table | `_metadata` is a hidden column and must be selected explicitly |
-| `STREAM` missing on the watchlist | Intentional: a materialized view is a batch query, so it has no `STREAM` |
-| `SHOW GRANTS` returned no rows | Owners have all privileges implicitly. Grants only list explicit grants |
-
-## Repository layout
-
-```
-kyc-lakehouse/
-  src/
-    pipelines/
-      ingestion
-        transformations/
-          bronze.sql              # Lakeflow Declarative Pipeline source
-    generator/
-      generate_kyc_data.py      # synthetic data generator
-  docs/                         # diagrams and notes
-  README.md
-```
 
 ### Late Arriving Data
 In this session, we will explain how autoloader handles late arriving data. This ![notebook](src/utilities/late_arrival) has some handy code you can run to demonstrate how autoloader handles late arriving files. We will go through the following steps
@@ -312,9 +287,47 @@ The column `channel` is missing here
 
 ![](docs/rerunning_after_txn_stopped.png)
 
+## Silver Layer
 
+Pipeline settings: root folder `src/pipelines`, source path `src/pipelines/transformation_pipeline/transformations`, default catalog `dev_kyc`, default schema `silver`.
 
+The silver layer of the transformation pipeline involves the following processing steps;
 
+1. **Type Casting**:  No rows are dropped here, so every Bronze row reaches either the valid table or the quarantine table.
+
+2. **Data Quality Check**: This is the step that loads valid records, Expectations rules  drop failing row. Thre constraints are set here and records are dropped when constraint is violated. Below are the constraints used;
+```
+  - txn_id IS NOT NULL
+  - amount > 0
+  - txn_ts IS NOT NULL
+  ```
+  3.  **Quarantine**: Bad records are quarantined. The constraints rules in step 2 are inverted so that bad records can be caught on a quarantine table
+
+  4. **Deduplication**: Transaction records are deduplicated on txn_id. This is done by making it an SCD1 stream. The transaction records with a later ingest_ts is kept
+
+  5. **Customers SCD1**: Customer is brought in as an SCD1 stream thereby overwriting duplicate customer using the customer_id filed. The customer record with the latest updated_at field is retained
+
+  6. **Customers SCD2**: In a bid to keep history on Customers, it is brought in as an SCD2 stream on a separate filed. History is only preserved when there is a change on address, city, state, risk_rating. This is done in order to demonstrate the difference between SCD1 and SCD2. In real life, it can be brought as an SCD2 stream only
+
+  This ![notebook](docs/utilities/silver_check.ipynb) has some code that can be used to validate the processing steps listed above. 
+
+## Repository layout
+
+```
+kyc-lakehouse/
+  src/
+    pipelines/
+      ingestion_pipeline
+        transformations/
+          bronze.sql              # Lakeflow Declarative Pipeline 
+      transformation_pipeline
+        transformations/
+          silver.sql              # Lakeflow Declarative Pipeline 
+    generator/
+      generate_kyc_data.py      # synthetic data generator
+  docs/                         # diagrams and notes
+  README.md
+```
 
 ## Roadmap
 
@@ -323,7 +336,7 @@ The column `channel` is missing here
 - [x] Synthetic data generator
 - [x] Bronze layer (days 1-2)
 - [x] Bronze incremental test (day 3 schema change, late file)
-- [ ] Silver: type casting, dedup, expectations, quarantine, SCD2 customers
+- [x ] Silver: type casting, dedup, expectations, quarantine, SCD2 customers
 - [ ] Gold: star schema, risk aggregates, watchlist screening flags
 - [ ] Governance: groups, column masks, row filters, lineage
 - [ ] SQL warehouse and dashboard
