@@ -116,7 +116,19 @@ SEQUENCE BY updated_at
 STORED AS SCD TYPE 2
 TRACK HISTORY ON address, city, state, risk_rating;
 
-
+CREATE OR REFRESH MATERIALIZED VIEW dev_kyc.silver.watchlist
+COMMENT 'Typed watchlist with a normalized name for matching.'
+AS
+SELECT
+  watchlist_id,
+  full_name,
+  lower(trim(regexp_replace(regexp_replace(full_name, '[^A-Za-z ]', ' '), ' +', ' '))) AS full_name_norm,
+  list_source,
+  upper(trim(country))            AS country,
+  try_cast(added_date AS DATE)    AS added_date,
+  source_file,
+  ingest_ts
+FROM dev_kyc.bronze.watchlist;
 
 
 
