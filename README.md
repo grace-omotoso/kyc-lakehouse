@@ -314,7 +314,32 @@ The silver layer of the transformation pipeline involves the following processin
   ![](docs/transformation_pipeline.png)
 
 
-  This ![notebook](src/utilities/silver_check.ipynb) has some code that can be used to validate the processing steps listed above. 
+  This ![notebook](src/utilities/silver_checks.ipynb) has some code that can be used to validate the processing steps listed above. 
+
+## Gold Layer
+
+Pipeline settings: root folder `src/pipelines`, source path `src/pipelines/transformation_pipeline/transformations`, default catalog `dev_kyc`, default schema `silver`. Names in gold.sql are fully qualified because the default schema used is silver. Fully qualified names ensures that tables are created in the silver schema.
+
+The gold layer of the transformation pipeline involves the creation of the following tables;
+
+1. **dim_customer**:  The silver SCD2 customer table is modified so that customer full names are normalized. A surrogate key is also created using customer_id and __START_AT so as to match transaction with the correct version of customer. Remember that customer records keep history in SCD2. The __START_AT from the customer SCD2 table is modified to allow transactions that happened before the __START_AT date to be processed. 
+
+2. **dim_date**:A date dimension table is created to include all the dates between the first transaction and the last transaction in the silver transactions table.
+
+3. **dim_merchant**: This table is generated from the silver transactions table. It contains information related to the transaction merchant .
+
+4. **fact_transactions**: This is the transaction fact table. it has some derived columns that do not exist in transactions that will be useful for investigative purposes
+
+5. **watchlist_matches**: This table contains POTENTIAL matches between current customers and the watchlist on normalized name. Name-only matches are low confidence and
+go to review. Customers who happen to share a name produce false positives.
+
+6. **custoer_risk_daily**: This table contains one row per customer per day with alert flags like deposits nearing 10,000, etc.
+
+This is the ![ERD](/docs/gold_erd.md) diagram of the gold layer
+
+  Run the transformation_pipeline pipeline (ensure there is a transformation folder with gold.sql file). The graph from the run should look similar to the one below;
+
+  This ![notebook](src/utilities/gold_checks.ipynb) has some code that can be used to validate the processing steps listed above. 
 
 
 ## Repository layout
@@ -329,6 +354,7 @@ kyc-lakehouse/
       transformation_pipeline
         transformations/
           silver.sql              # Lakeflow Declarative Pipeline 
+          gold.sql              # Lakeflow Declarative Pipeline 
     generator/
       generate_kyc_data.py      # synthetic data generator
   docs/                         # diagrams and notes
@@ -343,7 +369,7 @@ kyc-lakehouse/
 - [x] Bronze layer (days 1-2)
 - [x] Bronze incremental test (day 3 schema change, late file)
 - [x] Silver: type casting, dedup, expectations, quarantine, SCD2 customers
-- [ ] Gold: star schema, risk aggregates, watchlist screening flags
+- [x] Gold: star schema, risk aggregates, watchlist screening flags
 - [ ] Governance: groups, column masks, row filters, lineage
 - [ ] SQL warehouse and dashboard
 - [ ] Orchestration (Lakeflow Jobs)
