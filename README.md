@@ -362,6 +362,43 @@ In this section, we leveraged the power of unity catalog for ensuring data is se
 
 This ![notebook](src/utilities/governance_check.ipynb) is used to demonstrate how these governance rules work. 
 
+## Step 5: Visualization and Dashboard Creation
+In this section, we created datasets for dashboard which only consumes from the gold layer. 8 dashboards were created with each having its own datasets. Below are the dashboard that have been created;
+  1. **Transaction Summary**: Overall summary of transactions, showing transaction counts, amounts and alert thresholds.
+
+  ![](docs/dashboards/dashboard1.png)
+
+  2. **Daily Transaction**: This breaks down transaction by date showing count and total amount.
+
+  ![](docs/dashboards/dashboard2.png)
+
+  3. **Daily Alert**: This returns daily count of alerts.
+
+  ![](docs/dashboards/dashboard3.png)
+
+  4. **Top Customer Alerts**: Display customers with top alerts
+
+  ![](docs/dashboards/dashboard4.png)
+
+  5. **Spend By Merchant Category**: Displays amount spent by merchant category while also flagging high-risk categories
+
+      ![](docs/dashboards/dashboard5.png)
+
+  6. **High Risk Country Activity**: Displays the count and amount of transactions in high risk countries.
+
+        ![](docs/dashboards/dashboard6.png)
+
+
+  7. **Potential Watchlist Matches**: Displays the match confidence and the count of customers that potentally matched some names in watchlist
+
+      ![](docs/dashboards/dashboard7.png)
+
+  8. **Customers By Risk Rating**: Displays the number of customers in each risk category
+
+      ![](docs/dashboards/dashboard8.png)
+
+
+
 ## Repository layout
 ```
 kyc-lakehouse/
@@ -373,7 +410,11 @@ kyc-lakehouse/
       transformation_pipeline
         transformations/
           silver.sql              # Lakeflow Declarative Pipeline 
-          gold.sql              # Lakeflow Declarative Pipeline 
+          gold.sql               # Lakeflow Declarative Pipeline 
+    dashboards
+      dashboard_queries.sql     # SQL file that contains the queries for the dashboard datasets
+      KYC Dashboard             # Contains all the dashboards
+
     generator/
       generate_kyc_data.py      # synthetic data generator
   docs/                         # diagrams and notes
@@ -390,7 +431,7 @@ kyc-lakehouse/
 - [x] Silver: type casting, dedup, expectations, quarantine, SCD2 customers
 - [x] Gold: star schema, risk aggregates, watchlist screening flags
 - [x] Governance: groups, column masks, row filters, lineage
-- [ ] SQL warehouse and dashboard
+- [x] SQL warehouse and dashboard
 - [ ] Orchestration (Lakeflow Jobs)
 - [ ] Asset Bundles and GitHub Actions CI/CD
 - [ ] Monitoring (event log, system tables, alerts)
