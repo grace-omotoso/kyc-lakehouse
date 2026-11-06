@@ -360,7 +360,7 @@ In this section, we leveraged the power of unity catalog for ensuring data is se
 
 **Permissions on User Groups**: Data Engineers have all privileges on the bronze, silver, gold and ops schema. Analysts and Compliance only have SELECT on the gold schema. 
 
-This ![notebook][src/utilities/governance_check.ipynb] is used to demonstrate how these governance rules work. 
+This ![notebook](src/utilities/governance_check.ipynb) is used to demonstrate how these governance rules work. 
 
 ## Repository layout
 ```
