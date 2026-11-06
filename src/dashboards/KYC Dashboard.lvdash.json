@@ -1,0 +1,849 @@
+{
+  "datasets": [
+    {
+      "name": "b5949752",
+      "displayName": "Transaction Activity and Risk Metrics Summary",
+      "queryLines": [
+        "\n",
+        "-- 1. KPI tiles: overall activity and alert volume.\n",
+        "SELECT\n",
+        "  COUNT(*)                                                       AS transactions,\n",
+        "  SUM(amount)                                                    AS total_amount,\n",
+        "  SUM(CASE WHEN is_near_threshold THEN 1 ELSE 0 END)             AS near_threshold_txns,\n",
+        "  SUM(CASE WHEN is_high_risk_country THEN 1 ELSE 0 END)          AS high_risk_country_txns\n",
+        "FROM dev_kyc.gold.fact_transactions;"
+      ]
+    },
+    {
+      "name": "46590e2d",
+      "displayName": "Daily Transaction Analysis",
+      "queryLines": [
+        "-- 2. Daily transaction volume and amount (line or bar chart).\n",
+        "SELECT\n",
+        "  d.full_date,\n",
+        "  COUNT(*)        AS txns,\n",
+        "  SUM(f.amount)   AS total_amount\n",
+        "FROM dev_kyc.gold.fact_transactions f\n",
+        "JOIN dev_kyc.gold.dim_date d ON f.date_key = d.date_key\n",
+        "GROUP BY d.full_date\n",
+        "ORDER BY d.full_date;"
+      ]
+    },
+    {
+      "name": "19e22567",
+      "displayName": "Daily Alerts",
+      "queryLines": [
+        "-- 3. Alerts per day (stacked bar). Reads customer_risk_daily, which carries\n",
+        "--    the state row filter, so analyst viewers see only FL and GA customers\n",
+        "--    when the dashboard runs with viewer credentials.\n",
+        "SELECT\n",
+        "  txn_date,\n",
+        "  SUM(CASE WHEN structuring_alert   THEN 1 ELSE 0 END) AS structuring_alerts,\n",
+        "  SUM(CASE WHEN high_risk_geo_alert THEN 1 ELSE 0 END) AS high_risk_geo_alerts\n",
+        "FROM dev_kyc.gold.customer_risk_daily\n",
+        "GROUP BY txn_date\n",
+        "ORDER BY txn_date;"
+      ]
+    },
+    {
+      "name": "848b32ca",
+      "displayName": "Top Customer Alerts",
+      "queryLines": [
+        "-- 4. Top customers by alert days (table), with their current risk rating.\n",
+        "--    No SSN or name columns on purpose.\n",
+        "SELECT\n",
+        "  r.customer_id,\n",
+        "  c.risk_rating,\n",
+        "  SUM(CASE WHEN r.structuring_alert   THEN 1 ELSE 0 END) AS structuring_days,\n",
+        "  SUM(CASE WHEN r.high_risk_geo_alert THEN 1 ELSE 0 END) AS high_risk_geo_days,\n",
+        "  SUM(r.total_amount)                                    AS total_amount\n",
+        "FROM dev_kyc.gold.customer_risk_daily r\n",
+        "LEFT JOIN dev_kyc.gold.dim_customer c\n",
+        "  ON r.customer_id = c.customer_id AND c.is_current\n",
+        "GROUP BY r.customer_id, c.risk_rating\n",
+        "HAVING structuring_days > 0 OR high_risk_geo_days > 0\n",
+        "ORDER BY structuring_days DESC, high_risk_geo_days DESC, total_amount DESC\n",
+        "LIMIT 20;"
+      ]
+    },
+    {
+      "name": "04ebcbe9",
+      "displayName": "Merchant Category",
+      "queryLines": [
+        "SELECT\n",
+        "  m.merchant_category,\n",
+        "  m.is_high_risk_category,\n",
+        "  COUNT(*)        AS txns,\n",
+        "  SUM(f.amount)   AS total_amount\n",
+        "FROM dev_kyc.gold.fact_transactions f\n",
+        "JOIN dev_kyc.gold.dim_merchant m ON f.merchant_sk = m.merchant_sk\n",
+        "GROUP BY m.merchant_category, m.is_high_risk_category\n",
+        "ORDER BY total_amount DESC;\n"
+      ]
+    },
+    {
+      "name": "36db68e7",
+      "displayName": "High Risk Country Transactions",
+      "queryLines": [
+        "-- 6. High-risk country activity (bar chart or table).\n",
+        "SELECT\n",
+        "  txn_country,\n",
+        "  COUNT(*)      AS txns,\n",
+        "  SUM(amount)   AS total_amount\n",
+        "FROM dev_kyc.gold.fact_transactions\n",
+        "WHERE is_high_risk_country\n",
+        "GROUP BY txn_country\n",
+        "ORDER BY total_amount DESC;\n"
+      ]
+    },
+    {
+      "name": "478e7685",
+      "displayName": "Potential Watchlist Matches",
+      "queryLines": [
+        "-- 7. Potential watchlist matches awaiting review (counter or pie chart).\n",
+        "SELECT\n",
+        "  match_confidence,\n",
+        "  review_status,\n",
+        "  COUNT(*) AS matches\n",
+        "FROM dev_kyc.gold.watchlist_matches\n",
+        "GROUP BY match_confidence, review_status;"
+      ]
+    },
+    {
+      "name": "20d719e3",
+      "displayName": "Customers By Risk Rating",
+      "queryLines": [
+        "SELECT\n",
+        "  risk_rating,\n",
+        "  COUNT(*) AS customers\n",
+        "FROM dev_kyc.gold.dim_customer\n",
+        "WHERE is_current\n",
+        "GROUP BY risk_rating\n",
+        "ORDER BY customers DESC;"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "5d2fdf1b",
+      "displayName": "Transaction Summary",
+      "layout": [
+        {
+          "widget": {
+            "name": "a4e7bc77",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b5949752",
+                  "fields": [
+                    {
+                      "name": "sum(transactions)",
+                      "expression": "SUM(`transactions`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": false,
+                "showDescription": true,
+                "description": {
+                  "value": "Total Number of Transactions",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(transactions)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "16460ffc",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b5949752",
+                  "fields": [
+                    {
+                      "name": "sum(total_amount)",
+                      "expression": "SUM(`total_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "description": {
+                  "value": "Total Amount of Transaction",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_amount)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "042ebad0",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b5949752",
+                  "fields": [
+                    {
+                      "name": "sum(near_threshold_txns)",
+                      "expression": "SUM(`near_threshold_txns`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": false,
+                "showDescription": true,
+                "description": {
+                  "value": "Total Near Threshold \n\nTransasctions",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(near_threshold_txns)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "ec1d9aec",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b5949752",
+                  "fields": [
+                    {
+                      "name": "sum(high_risk_country_txns)",
+                      "expression": "SUM(`high_risk_country_txns`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "description": {
+                  "value": "Total High Risk Country\n\nTransactions",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(high_risk_country_txns)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "d99b4769",
+      "displayName": "Daily Transaction",
+      "layout": [
+        {
+          "widget": {
+            "name": "c6ec8486",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "46590e2d",
+                  "fields": [
+                    {
+                      "name": "daily(full_date)",
+                      "expression": "DATE_TRUNC(\"DAY\", `full_date`)"
+                    },
+                    {
+                      "name": "sum(total_amount)",
+                      "expression": "SUM(`total_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "description": {
+                  "value": "**Daily Transaction Amount**",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  }
+                ],
+                "marker": {
+                  "shape": "circle"
+                }
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(full_date)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_amount)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "aa0d69ad",
+      "displayName": "Daily Alert",
+      "layout": [
+        {
+          "widget": {
+            "name": "cdce7689",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "19e22567",
+                  "fields": [
+                    {
+                      "name": "daily(txn_date)",
+                      "expression": "DATE_TRUNC(\"DAY\", `txn_date`)"
+                    },
+                    {
+                      "name": "sum(structuring_alerts)",
+                      "expression": "SUM(`structuring_alerts`)"
+                    },
+                    {
+                      "name": "sum(high_risk_geo_alerts)",
+                      "expression": "SUM(`high_risk_geo_alerts`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "description": {
+                  "value": "Number of Daily Alerts",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(txn_date)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(structuring_alerts)"
+                    },
+                    {
+                      "fieldName": "sum(high_risk_geo_alerts)"
+                    }
+                  ]
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "3acc47c0",
+      "displayName": "Potential Watchlist Matches",
+      "layout": [
+        {
+          "widget": {
+            "name": "c884027f",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "478e7685",
+                  "fields": [
+                    {
+                      "name": "sum(matches)",
+                      "expression": "SUM(`matches`)"
+                    },
+                    {
+                      "name": "match_confidence",
+                      "expression": "`match_confidence`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "facet": {
+                "type": "wrap",
+                "fieldName": "match_confidence",
+                "scale": {
+                  "type": "categorical"
+                }
+              },
+              "frame": {
+                "showDescription": true,
+                "description": {
+                  "value": "Number of Customers that match up to Watchlist",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(matches)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 1,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "67d05ce4",
+      "displayName": "Customers By Risk Rating",
+      "layout": [
+        {
+          "widget": {
+            "name": "a8b35291",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "20d719e3",
+                  "fields": [
+                    {
+                      "name": "risk_rating",
+                      "expression": "`risk_rating`"
+                    },
+                    {
+                      "name": "sum(customers)",
+                      "expression": "SUM(`customers`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "description": {
+                  "value": "Customer Count By Risk Rating",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 1
+                  }
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "risk_rating",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(customers)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "1cdea979",
+      "displayName": "Top Customer Alerts",
+      "layout": [
+        {
+          "widget": {
+            "name": "58c57f26",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "848b32ca",
+                  "fields": [
+                    {
+                      "name": "customer_id",
+                      "expression": "`customer_id`"
+                    },
+                    {
+                      "name": "risk_rating",
+                      "expression": "`risk_rating`"
+                    },
+                    {
+                      "name": "structuring_days",
+                      "expression": "`structuring_days`"
+                    },
+                    {
+                      "name": "high_risk_geo_days",
+                      "expression": "`high_risk_geo_days`"
+                    },
+                    {
+                      "name": "total_amount",
+                      "expression": "`total_amount`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "description": {
+                  "value": "Top Customer Alerts",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "customer_id"
+                  },
+                  {
+                    "fieldName": "risk_rating"
+                  },
+                  {
+                    "fieldName": "structuring_days"
+                  },
+                  {
+                    "fieldName": "high_risk_geo_days"
+                  },
+                  {
+                    "fieldName": "total_amount"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "de51f911",
+      "displayName": "Merchant Category",
+      "layout": [
+        {
+          "widget": {
+            "name": "7527bf0e",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "04ebcbe9",
+                  "fields": [
+                    {
+                      "name": "is_high_risk_category",
+                      "expression": "`is_high_risk_category`"
+                    },
+                    {
+                      "name": "merchant_category",
+                      "expression": "`merchant_category`"
+                    },
+                    {
+                      "name": "sum(total_amount)",
+                      "expression": "SUM(`total_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "description": {
+                  "value": "Transaction Amount per Merchant Category",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "merchant_category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_amount)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "is_high_risk_category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "0ae98d5b",
+      "displayName": "High Risk Country Transactions",
+      "layout": [
+        {
+          "widget": {
+            "name": "d9af1680",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "36db68e7",
+                  "fields": [
+                    {
+                      "name": "txn_country",
+                      "expression": "`txn_country`"
+                    },
+                    {
+                      "name": "sum(total_amount)",
+                      "expression": "SUM(`total_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "description": {
+                  "value": "Transaction Amount in High Risk Countries",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  }
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "txn_country",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_amount)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 1,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
