@@ -17,24 +17,44 @@
 -- version_start_at keeps the real start of each version.
 -- ssn is kept here on purpose: the governance phase applies a column mask.
 -- ---------------------------------------------------------------------
-
-CREATE OR REFRESH MATERIALIZED VIEW dev_kyc.gold.dim_customer
-COMMENT 'Customer dimension, SCD type 2. Join facts on customer_sk'
+-- Governance: masks on materialized views must be declared in the CREATE
+-- statement, and only apply to columns with a declared type, so this view has
+-- an explicit column list. Run governance.sql (functions) BEFORE this file.
+CREATE OR REFRESH MATERIALIZED VIEW dev_kyc.gold.dim_customer (
+  customer_sk       BIGINT,
+  customer_id       STRING,
+  first_name        STRING,
+  last_name         STRING,
+  full_name_norm    STRING,
+  ssn               STRING MASK dev_kyc.ops.mask_ssn,
+  dob               DATE,
+  address           STRING,
+  city              STRING,
+  state             STRING,
+  country           STRING,
+  risk_rating       STRING,
+  kyc_status        STRING,
+  valid_from        TIMESTAMP,
+  valid_to          TIMESTAMP,
+  version_start_at  TIMESTAMP,
+  is_current        BOOLEAN
+)
+COMMENT 'Customer dimension, SCD type 2. Join facts on customer_sk. ssn is masked.'
 AS
 SELECT
-xxhash64(customer_id, CAST(__START_AT AS STRING))   AS customer_sk,
-customer_id,
-first_name,
-last_name,
-lower(trim(regexp_replace(regexp_replace(concat_ws(' ', first_name, last_name), '[^A-Za-z ]', ' '), ' +', ' '))) AS full_name_norm,
-ssn,
-dob,
-address,
-city,
-state,
-country,
-risk_rating,
-kyc_status,
+  xxhash64(customer_id, CAST(__START_AT AS STRING))                      AS customer_sk,
+  customer_id,
+  first_name,
+  last_name,
+  lower(trim(regexp_replace(regexp_replace(concat_ws(' ', first_name, last_name), '[^A-Za-z ]', ' '), ' +', ' '))) AS full_name_norm,
+  ssn,
+  dob,
+  address,
+  city,
+  state,
+  country,
+  risk_rating,
+  kyc_status,
   CASE
     WHEN __START_AT = MIN(__START_AT) OVER (PARTITION BY customer_id)
       THEN TIMESTAMP '1900-01-01 00:00:00'
@@ -44,6 +64,7 @@ kyc_status,
   __START_AT                                                             AS version_start_at,
   (__END_AT IS NULL)                                                     AS is_current
 FROM dev_kyc.silver.customers_scd2;
+
 
 -- ---------------------------------------------------------------------
 -- dim_date: one row per calendar day between the first and last transaction.
@@ -85,6 +106,7 @@ SELECT DISTINCT
   merchant_category IN ('CRYPTO', 'GAMBLING', 'MONEY_TRANSFER')   AS is_high_risk_category
 FROM dev_kyc.silver.transactions;
 
+
 -- ---------------------------------------------------------------------
 -- fact_transactions: one row per transaction (grain of silver.transactions).
 -- Each transaction is joined to the customer version that was valid at txn_ts
@@ -121,6 +143,7 @@ LEFT JOIN dev_kyc.gold.dim_customer c
   AND t.txn_ts >= c.valid_from
   AND t.txn_ts <  COALESCE(c.valid_to, TIMESTAMP '9999-12-31 00:00:00');
 
+
 -- ---------------------------------------------------------------------
 -- watchlist_matches: POTENTIAL matches between current customers and the
 -- watchlist on normalized name. Name-only matches are low confidence and
@@ -147,12 +170,17 @@ WHERE c.is_current;
 -- customer_risk_daily: one row per customer per day with alert flags.
 -- structuring_alert: 3 or more near-threshold deposits in a day.
 -- ---------------------------------------------------------------------
+-- Row filter lives on this LEAF view on purpose: nothing else reads it, so
+-- the filter cannot silently remove rows from other Gold objects.
+-- customer_state (state of the customer's current version) drives the filter.
 CREATE OR REFRESH MATERIALIZED VIEW dev_kyc.gold.customer_risk_daily
-COMMENT 'Daily per-customer activity and AML alert flags.'
+COMMENT 'Daily per-customer activity and AML alert flags. Row filtered by customer state.'
+WITH ROW FILTER dev_kyc.ops.state_filter ON (customer_state)
 AS
 SELECT
   f.customer_id,
   f.date_key,
+  cs.state                                                        AS customer_state,
   d.full_date                                                     AS txn_date,
   COUNT(*)                                                        AS txn_count,
   SUM(f.amount)                                                   AS total_amount,
@@ -171,4 +199,10 @@ LEFT JOIN (
   GROUP BY customer_id
 ) m
   ON f.customer_id = m.customer_id
-GROUP BY f.customer_id, f.date_key, d.full_date;
+LEFT JOIN (
+  SELECT customer_id, state
+  FROM dev_kyc.gold.dim_customer
+  WHERE is_current
+) cs
+  ON f.customer_id = cs.customer_id
+GROUP BY f.customer_id, f.date_key, d.full_date, cs.state;

@@ -17,6 +17,15 @@ A bank needs to monitor customer transactions for money-laundering risk. Three f
 
 ![Architecture diagram](docs/architecture.png)
 
+### Project Sections
+1. Synthetic Data Generation
+2. AWS Setup and Data Load to s3
+3. Databricks Connection to AWS
+4. The Medallion Layer (Bronze, Silver and Gold)
+5. Data Governance
+6. Dashboard and Visualization
+7. Pipeline SetUp, Monitoring and Management
+
 ## Step 1: Synthetic Data Generation
 The data used in this project is fully synthetic. Names, SSNs (9xx range, never issued) and accounts are fake. This is the ![python code](src/generator/generate_kyc_data.py ) used to generate the synthetic data.
  
@@ -77,7 +86,7 @@ erDiagram
 | Structuring (4-6 deposits of 9,000-9,900) and high-risk-country transfers | AML detection scenarios in Gold |
 | Customer names matching the watchlist | Screening and false-positive handling |
 
-## Step 2: AWS Setup
+## Step 2: AWS Setup and Data Load to s3
 In this project we moved the generated data to S3 to mimic real life situation. We can have data coming from various sources but most times, they make their way to S3 raw and unfiltered. Using S3 provides the opportunity to learn all the necessary steps needed to connect S3 to Databricks. The S3 setup step can be skipped if AWS cost will be an issue.
 
 ### 1. S3 bucket
@@ -159,7 +168,7 @@ Attach the S3 policY to the role. Open your role, then Permissions, then Add per
 **Step 4: Copy the Role ARN **
 Copy the role ARN. It’s at the top of the role page and looks like arn:aws:iam::<AWS-ACCOUNT-ID>:role/kyc-lakehouse-uc-role.
 
-## Step 3: Hand off to Databricks
+## Step 3: Databricks Connection to AWS
 In this step, we connnect AWS S3 to databricks so we can access the data in our S3 bucket from databricks. 
 Navigate to your databricks account;
 1. **Catalog > External data > Credentials > Create credential**, select *Storage credential*, type AWS IAM Role. Enter a name and the role ARN. Databricks then shows the external ID. Copy the external ID.
@@ -171,7 +180,7 @@ Back in AWS, open the role, go to the Trust relationships tab, and replace the <
 
 4. Click **Test connection**. A pass confirms the role, trust policy and permissions are aligned.
 
-## Step 4: Create Catalog and schemas
+## Step 4: The Medallion Layer (Bronze, Silver and Gold)
 
 ```sql
 CREATE CATALOG IF NOT EXISTS dev_kyc
@@ -342,8 +351,18 @@ This is the ![ERD](/docs/gold_erd.md) diagram of the gold layer
   This ![notebook](src/utilities/gold_checks.ipynb) has some code that can be used to validate the processing steps listed above. 
 
 
-## Repository layout
+## Step 5: Data Governance
+In this section, we leveraged the power of unity catalog for ensuring data is secured and properly governed. We created a ![governance SQL](src/governance/governance.sql) file to ensure the governance take place at the user account.group level. User groups (data_engineers, analysts, compliance) need to be created in order to test how the rules work. The following controls were set up in the governance SQL file
 
+**Mask Function on SSN**: SSN is a PII and thereby should not be visible to all and sundry. The function masks SSN to non-compliance team member i.e only members of the compliance team can see the SSN unmasked
+
+**Row Filter Function**: This function displays rows based on the customer state. Engineers and Compliance group sees all states but analysts see in records with state in GA and FL.
+
+**Permissions on User Groups**: Data Engineers have all privileges on the bronze, silver, gold and ops schema. Analysts and Compliance only have SELECT on the gold schema. 
+
+This ![notebook](src/utilities/governance_check.ipynb) is used to demonstrate how these governance rules work. 
+
+## Repository layout
 ```
 kyc-lakehouse/
   src/
@@ -370,7 +389,7 @@ kyc-lakehouse/
 - [x] Bronze incremental test (day 3 schema change, late file)
 - [x] Silver: type casting, dedup, expectations, quarantine, SCD2 customers
 - [x] Gold: star schema, risk aggregates, watchlist screening flags
-- [ ] Governance: groups, column masks, row filters, lineage
+- [x] Governance: groups, column masks, row filters, lineage
 - [ ] SQL warehouse and dashboard
 - [ ] Orchestration (Lakeflow Jobs)
 - [ ] Asset Bundles and GitHub Actions CI/CD
