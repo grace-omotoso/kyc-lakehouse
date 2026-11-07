@@ -24,6 +24,7 @@ A bank needs to monitor customer transactions for money-laundering risk. Three f
 4. The Medallion Layer (Bronze, Silver and Gold)
 5. Data Governance
 6. Dashboard and Visualization
+7. Orchestration
 7. Pipeline SetUp, Monitoring and Management
 
 ## Step 1: Synthetic Data Generation
@@ -362,7 +363,7 @@ In this section, we leveraged the power of unity catalog for ensuring data is se
 
 This ![notebook](src/utilities/governance_check.ipynb) is used to demonstrate how these governance rules work. 
 
-## Step 5: Visualization and Dashboard Creation
+## Step 6: Visualization and Dashboard Creation
 In this section, we created datasets for dashboard which only consumes from the gold layer. 8 dashboards were created with each having its own datasets. Below are the dashboard that have been created;
   1. **Transaction Summary**: Overall summary of transactions, showing transaction counts, amounts and alert thresholds.
 
@@ -397,6 +398,11 @@ In this section, we created datasets for dashboard which only consumes from the 
 
       ![](docs/dashboards/dashboard8.png)
 
+## Step 7: Orchestration
+
+This is the step where the job pipeline is setup so we can run the bronze, silver, gold, dashboard as one job. We added 2 quality gates validate_silver and validate_gold. The DQ tasks ensures that silver and gold layers have no quality issues before the dashboard is refreshed.
+
+![](docs/job_pipeline.png)
 
 
 ## Repository layout
@@ -432,7 +438,7 @@ kyc-lakehouse/
 - [x] Gold: star schema, risk aggregates, watchlist screening flags
 - [x] Governance: groups, column masks, row filters, lineage
 - [x] SQL warehouse and dashboard
-- [ ] Orchestration (Lakeflow Jobs)
+- [x] Orchestration (Lakeflow Jobs)
 - [ ] Asset Bundles and GitHub Actions CI/CD
 - [ ] Monitoring (event log, system tables, alerts)
 - [ ] Performance tuning with before/after measurements
