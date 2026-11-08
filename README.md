@@ -25,7 +25,7 @@ A bank needs to monitor customer transactions for money-laundering risk. Three f
 5. Data Governance
 6. Dashboard and Visualization
 7. Orchestration
-7. Pipeline SetUp, Monitoring and Management
+8. Monitoring and Alerts
 
 ## Step 1: Synthetic Data Generation
 The data used in this project is fully synthetic. Names, SSNs (9xx range, never issued) and accounts are fake. This is the ![python code](src/generator/generate_kyc_data.py ) used to generate the synthetic data.
@@ -404,6 +404,15 @@ This is the step where the job pipeline is setup so we can run the bronze, silve
 
 ![](docs/job_pipeline.png)
 
+## Step 8: Monitoring and Alerts
+**Root Folder**: `src/monitoring`
+
+In this section, the pipelines is being monitored for any anomaly. On a high level, the following processes were performed;
+1. Event logs were published  for the ingestion and transformation pipeline
+2. Tables that are handy for monitoring our pipeline were created using SQL queries in the monitoring_setup query
+3. A metric task was added to the job that depends on the validate_silver/gold tasks. This metrics are populated in the run_log ops table. It keeps track of the number of rows generated for all the medallion tables per run. This is useful are table rows may increase after each run and this tables just keeps track of the state of all the tables at each run.
+4. Alerts are created based on some table columns created in step 2 e.g max_hours_since_ingest, failed_update, etc. Alerts are created using the queries in the `monitoring_queries.sql` file one alert per query
+
 
 ## Repository layout
 ```
@@ -439,6 +448,6 @@ kyc-lakehouse/
 - [x] Governance: groups, column masks, row filters, lineage
 - [x] SQL warehouse and dashboard
 - [x] Orchestration (Lakeflow Jobs)
+- [x] Monitoring (event log, system tables, alerts)
 - [ ] Asset Bundles and GitHub Actions CI/CD
-- [ ] Monitoring (event log, system tables, alerts)
 - [ ] Performance tuning with before/after measurements
