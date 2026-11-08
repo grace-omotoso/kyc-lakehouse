@@ -1,0 +1,22 @@
+# =====================================================================
+# databricks.yml  (repo root)
+# Dev-only bundle that adopts the resources already built in the workspace.
+# A prod target is added in a second pass, after the catalog and paths are
+# parameterized with variables.
+# =====================================================================
+bundle:
+  name: kyc-lakehouse
+
+# Resource definitions generated with `databricks bundle generate ...` land in
+# resources/ and are picked up here.
+include:
+  - resources/*.yml
+
+targets:
+  dev:
+    default: true
+    # No `mode: development` on purpose: development mode prefixes resource
+    # names and pauses schedules, which would rename the pipelines and job
+    # you are about to bind. Revisit when you add a prod target.
+    workspace:
+      host: https://dbc-f15efaae-793b.cloud.databricks.com/browse/folders/1345159113975000  # same URL you used for databricks auth login
