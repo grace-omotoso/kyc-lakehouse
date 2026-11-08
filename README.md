@@ -411,6 +411,9 @@ In this section, the pipelines is being monitored for any anomaly. On a high lev
 1. Event logs were published  for the ingestion and transformation pipeline
 2. Tables that are handy for monitoring our pipeline were created using SQL queries in the monitoring_setup query
 3. A metric task was added to the job that depends on the validate_silver/gold tasks. This metrics are populated in the run_log ops table. It keeps track of the number of rows generated for all the medallion tables per run. This is useful are table rows may increase after each run and this tables just keeps track of the state of all the tables at each run.
+This is what the pipeline looks after adding an the DQ metrics that depends on the two validation jobs
+
+![](docs/job_with_monitoring.png)
 4. Alerts are created based on some table columns created in step 2 e.g max_hours_since_ingest, failed_update, etc. Alerts are created using the queries in the `monitoring_queries.sql` file one alert per query
 
 
