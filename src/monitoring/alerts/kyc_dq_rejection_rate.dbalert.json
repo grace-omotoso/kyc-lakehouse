@@ -1,0 +1,43 @@
+{
+  "evaluation": {
+    "source": {
+      "name": "failed_pct",
+      "display": "source",
+      "aggregation": "MAX"
+    },
+    "comparison_operator": "GREATER_THAN",
+    "threshold": {
+      "value": {
+        "double_value": 5.0
+      }
+    },
+    "notification": {}
+  },
+  "query_lines": [
+    "WITH parsed AS (",
+    "  SELECT",
+    "    origin.update_id AS update_id,",
+    "    timestamp,",
+    "    explode(",
+    "      from_json(",
+    "        details:flow_progress.data_quality.expectations,",
+    "        'array<struct<name:string, dataset:string, passed_records:int, failed_records:int>>'",
+    "      )",
+    "    ) AS e",
+    "  FROM dev_kyc.ops.event_log_transformation",
+    "  WHERE event_type = 'flow_progress'",
+    "    AND details:flow_progress.data_quality.expectations IS NOT NULL",
+    ")",
+    "SELECT",
+    "  update_id,",
+    "  MIN(timestamp)                                                     AS first_event_ts,",
+    "  e.dataset                                                          AS dataset,",
+    "  e.name                                                             AS expectation,",
+    "  SUM(e.passed_records)                                              AS passed_records,",
+    "  SUM(e.failed_records)                                              AS failed_records,",
+    "  ROUND(100.0 * SUM(e.failed_records)",
+    "        / NULLIF(SUM(e.passed_records) + SUM(e.failed_records), 0), 2) AS failed_pct",
+    "FROM parsed",
+    "GROUP BY update_id, e.dataset, e.name;"
+  ]
+}
