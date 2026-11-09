@@ -1,0 +1,19 @@
+resources:
+  pipelines:
+    transformation_pipeline:
+      name: transformation_pipeline
+      libraries:
+        - glob:
+            include: ../src/pipelines/transformation_pipeline/transformations/**
+      catalog: dev_kyc
+      channel: CURRENT
+      continuous: false
+      event_log:
+        catalog: dev_kyc
+        name: event_log_transformation
+        schema: ops
+      photon: true
+      root_path: ../src/pipelines/transformation_pipeline
+      schema: silver
+      serverless: true
+

@@ -1,0 +1,18 @@
+resources:
+  pipelines:
+    ingestion_pipeline:
+      name: ingestion_pipeline
+      libraries:
+        - glob:
+            include: ../src/pipelines/ingestion_pipeline/transformations/**
+      catalog: dev_kyc
+      channel: CURRENT
+      continuous: false
+      event_log:
+        catalog: dev_kyc
+        name: event_log_ingestion
+        schema: ops
+      photon: true
+      root_path: ../src/pipelines/ingestion_pipeline
+      schema: bronze
+      serverless: true

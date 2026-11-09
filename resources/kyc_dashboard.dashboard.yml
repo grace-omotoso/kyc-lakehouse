@@ -1,0 +1,6 @@
+resources:
+  dashboards:
+    kyc_dashboard:
+      display_name: "KYC Dashboard"
+      warehouse_id: 55d7393afe190294
+      file_path: ../src/kyc_dashboard.lvdash.json
